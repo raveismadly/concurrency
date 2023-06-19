@@ -24,18 +24,17 @@ public class PriceAggregator {
 
     public double getMinPrice(long itemId) {
         // place for your code
-        CompletableFuture<Double>[] features = shopIds.stream()
+        List<CompletableFuture<Double>> features = shopIds.stream()
                 .map(shopId ->
                         CompletableFuture.supplyAsync(() -> priceRetriever.getPrice(itemId, shopId), executor)
                                 .completeOnTimeout(Double.NaN, 2900, TimeUnit.MILLISECONDS)
-                                .handleAsync((result, ex) -> Objects.isNull(result) ? Double.NaN : result)
-                ).toArray(CompletableFuture[]::new);
+                                .exceptionally((ex) -> Double.NaN))
+                .toList();
 
-        CompletableFuture.allOf(features).join();
-
-        return Arrays.stream(features)
-                .map(CompletableFuture::join)
-                .min(Comparator.comparingDouble(d -> Double.isNaN(d) ? Double.POSITIVE_INFINITY : d))
+        return features.stream()
+                .mapToDouble(CompletableFuture::join)
+                .filter(Double::isFinite)
+                .min()
                 .orElse(Double.NaN);
     }
 }
